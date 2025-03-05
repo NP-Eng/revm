@@ -375,71 +375,48 @@ impl core::error::Error for InvalidTransaction {}
 
 impl fmt::Display for InvalidTransaction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::PriorityFeeGreaterThanMaxFee => {
-                write!(f, "priority fee is greater than max fee")
-            }
-            Self::GasPriceLessThanBasefee => {
-                write!(f, "gas price is less than basefee")
-            }
-            Self::CallerGasLimitMoreThanBlock => {
-                write!(f, "caller gas limit exceeds the block gas limit")
-            }
-            Self::CallGasCostMoreThanGasLimit => {
-                write!(f, "call gas cost exceeds the gas limit")
-            }
-            Self::GasFloorMoreThanGasLimit => {
-                write!(f, "gas floor exceeds the gas limit")
-            }
-            Self::RejectCallerWithCode => {
-                write!(f, "reject transactions from senders with deployed code")
-            }
+        let msg = match self {
+            Self::PriorityFeeGreaterThanMaxFee => "priority fee is greater than max fee",
+            Self::GasPriceLessThanBasefee => "gas price is less than basefee",
+            Self::CallerGasLimitMoreThanBlock => "caller gas limit exceeds the block gas limit",
+            Self::CallGasCostMoreThanGasLimit => "call gas cost exceeds the gas limit",
+            Self::GasFloorMoreThanGasLimit => "gas floor exceeds the gas limit",
+            Self::RejectCallerWithCode => "reject transactions from senders with deployed code",
             Self::LackOfFundForMaxFee { fee, balance } => {
-                write!(f, "lack of funds ({balance}) for max fee ({fee})")
+                return write!(f, "lack of funds ({balance}) for max fee ({fee})")
             }
-            Self::OverflowPaymentInTransaction => {
-                write!(f, "overflow payment in transaction")
-            }
-            Self::NonceOverflowInTransaction => {
-                write!(f, "nonce overflow in transaction")
-            }
+            Self::OverflowPaymentInTransaction => "overflow payment in transaction",
+            Self::NonceOverflowInTransaction => "nonce overflow in transaction",
             Self::NonceTooHigh { tx, state } => {
-                write!(f, "nonce {tx} too high, expected {state}")
+                return write!(f, "nonce {tx} too high, expected {state}")
             }
             Self::NonceTooLow { tx, state } => {
-                write!(f, "nonce {tx} too low, expected {state}")
+                return write!(f, "nonce {tx} too low, expected {state}")
             }
-            Self::CreateInitCodeSizeLimit => {
-                write!(f, "create initcode size limit")
-            }
-            Self::InvalidChainId => write!(f, "invalid chain ID"),
-            Self::AccessListNotSupported => write!(f, "access list not supported"),
-            Self::MaxFeePerBlobGasNotSupported => {
-                write!(f, "max fee per blob gas not supported")
-            }
-            Self::BlobVersionedHashesNotSupported => {
-                write!(f, "blob versioned hashes not supported")
-            }
+            Self::CreateInitCodeSizeLimit => "create initcode size limit",
+            Self::InvalidChainId => "invalid chain ID",
+            Self::AccessListNotSupported => "access list not supported",
+            Self::MaxFeePerBlobGasNotSupported => "max fee per blob gas not supported",
+            Self::BlobVersionedHashesNotSupported => "blob versioned hashes not supported",
             Self::BlobGasPriceGreaterThanMax => {
-                write!(f, "blob gas price is greater than max fee per blob gas")
+                "blob gas price is greater than max fee per blob gas"
             }
-            Self::EmptyBlobs => write!(f, "empty blobs"),
-            Self::BlobCreateTransaction => write!(f, "blob create transaction"),
+            Self::EmptyBlobs => "empty blobs",
+            Self::BlobCreateTransaction => "blob create transaction",
             Self::TooManyBlobs { max, have } => {
-                write!(f, "too many blobs, have {have}, max {max}")
+                return write!(f, "too many blobs, have {have}, max {max}")
             }
-            Self::BlobVersionNotSupported => write!(f, "blob version not supported"),
-            Self::EofCreateShouldHaveToAddress => write!(f, "EOF crate should have `to` address"),
-            Self::AuthorizationListNotSupported => write!(f, "authorization list not supported"),
-            Self::AuthorizationListInvalidFields => {
-                write!(f, "authorization list tx has invalid fields")
-            }
-            Self::EmptyAuthorizationList => write!(f, "empty authorization list"),
-            Self::Eip2930NotSupported => write!(f, "Eip2930 is not supported"),
-            Self::Eip1559NotSupported => write!(f, "Eip1559 is not supported"),
-            Self::Eip4844NotSupported => write!(f, "Eip4844 is not supported"),
-            Self::Eip7702NotSupported => write!(f, "Eip7702 is not supported"),
-        }
+            Self::BlobVersionNotSupported => "blob version not supported",
+            Self::EofCreateShouldHaveToAddress => "EOF create should have `to` address",
+            Self::AuthorizationListNotSupported => "authorization list not supported",
+            Self::AuthorizationListInvalidFields => "authorization list tx has invalid fields",
+            Self::EmptyAuthorizationList => "empty authorization list",
+            Self::Eip2930NotSupported => "EIP-2930 is not supported",
+            Self::Eip1559NotSupported => "EIP-1559 is not supported",
+            Self::Eip4844NotSupported => "EIP-4844 is not supported",
+            Self::Eip7702NotSupported => "EIP-7702 is not supported",
+        };
+        write!(f, "{msg}")
     }
 }
 

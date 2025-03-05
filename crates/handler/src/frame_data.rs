@@ -46,69 +46,56 @@ pub enum FrameResult {
     EOFCreate(CreateOutcome),
 }
 
+macro_rules! get_interpreter_result {
+    ($self:expr) => {
+        match $self {
+            FrameResult::Call(CallOutcome { result, .. })
+            | FrameResult::EOFCreate(CreateOutcome { result, .. })
+            | FrameResult::Create(CreateOutcome { result, .. }) => result,
+        }
+    };
+}
+
 impl FrameResult {
     /// Casts frame result to interpreter result.
     #[inline]
     pub fn into_interpreter_result(self) -> InterpreterResult {
-        match self {
-            FrameResult::Call(outcome) => outcome.result,
-            FrameResult::Create(outcome) => outcome.result,
-            FrameResult::EOFCreate(outcome) => outcome.result,
-        }
-    }
-
-    /// Returns execution output.
-    #[inline]
-    pub fn output(&self) -> Output {
-        match self {
-            FrameResult::Call(outcome) => Output::Call(outcome.result.output.clone()),
-            FrameResult::Create(outcome) => {
-                Output::Create(outcome.result.output.clone(), outcome.address)
-            }
-            FrameResult::EOFCreate(outcome) => {
-                Output::Create(outcome.result.output.clone(), outcome.address)
-            }
-        }
-    }
-
-    /// Returns reference to gas.
-    #[inline]
-    pub fn gas(&self) -> &Gas {
-        match self {
-            FrameResult::Call(outcome) => &outcome.result.gas,
-            FrameResult::Create(outcome) => &outcome.result.gas,
-            FrameResult::EOFCreate(outcome) => &outcome.result.gas,
-        }
-    }
-
-    /// Returns mutable reference to interpreter result.
-    #[inline]
-    pub fn gas_mut(&mut self) -> &mut Gas {
-        match self {
-            FrameResult::Call(outcome) => &mut outcome.result.gas,
-            FrameResult::Create(outcome) => &mut outcome.result.gas,
-            FrameResult::EOFCreate(outcome) => &mut outcome.result.gas,
-        }
+        get_interpreter_result!(self)
     }
 
     /// Returns reference to interpreter result.
     #[inline]
     pub fn interpreter_result(&self) -> &InterpreterResult {
-        match self {
-            FrameResult::Call(outcome) => &outcome.result,
-            FrameResult::Create(outcome) => &outcome.result,
-            FrameResult::EOFCreate(outcome) => &outcome.result,
-        }
+        get_interpreter_result!(self)
     }
 
     /// Returns mutable reference to interpreter result.
     #[inline]
-    pub fn interpreter_result_mut(&mut self) -> &InterpreterResult {
-        match self {
-            FrameResult::Call(outcome) => &mut outcome.result,
-            FrameResult::Create(outcome) => &mut outcome.result,
-            FrameResult::EOFCreate(outcome) => &mut outcome.result,
+    pub fn interpreter_result_mut(&mut self) -> &mut InterpreterResult {
+        get_interpreter_result!(self)
+    }
+
+    /// Returns execution output.
+    pub fn output(&self) -> Output {
+        let output = get_interpreter_result!(self).output.clone();
+
+        if let FrameResult::Create(outcome) | FrameResult::EOFCreate(outcome) = self {
+            return Output::Create(output, outcome.address);
         }
+
+        Output::Call(output)
+    }
+
+    /// Returns reference to gas.
+    #[inline]
+    pub fn gas(&self) -> &Gas {
+        &get_interpreter_result!(self).gas
+    }
+
+    /// Returns mutable reference to interpreter result.
+    #[inline]
+    pub fn gas_mut(&mut self) -> &mut Gas {
+        &mut get_interpreter_result!(self).gas
     }
 
     /// Return Instruction result.
