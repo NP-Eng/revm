@@ -25,6 +25,9 @@ pub struct JournaledState<DB> {
     pub database: DB,
     /// The current state
     pub state: EvmState,
+    // NP TODO doc
+    /// NP TODO doc
+    pub note_tree: NoteTree,
     /// Transient storage that is discarded after every transaction.
     ///
     /// See [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153).
@@ -56,6 +59,7 @@ pub struct JournaledState<DB> {
     pub precompiles: HashSet<Address>,
 }
 
+// NP EXPL Only implementor of Journal
 impl<DB: Database> Journal for JournaledState<DB> {
     type Database = DB;
     // TODO : Make a struck here.

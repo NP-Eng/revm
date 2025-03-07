@@ -16,6 +16,7 @@ members = [
     "crates/context",
     "crates/context/interface",
     "crates/handler",
+    "crates/pool",
 
     # variants
     "crates/optimism",

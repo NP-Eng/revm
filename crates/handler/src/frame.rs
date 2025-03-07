@@ -507,6 +507,10 @@ where
         inputs: ExtendedInputs,
     ) -> Result<ItemOrResult<Self, FrameResult>, ERROR> {
         todo!()
+
+        // Checks
+
+        // Warm up tree with sibling paths?
     }
 
     pub fn init_with_context(
