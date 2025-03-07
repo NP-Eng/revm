@@ -208,6 +208,10 @@ pub fn validate_tx_env<CTX: ContextTr, Error>(
                 return Err(InvalidTransaction::EmptyAuthorizationList);
             }
         }
+        TransactionType::Extended => {
+            // NP TODO
+            todo!()
+        }
         TransactionType::Custom => {
             // Custom transaction type check is not done here.
         }

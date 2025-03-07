@@ -1,6 +1,8 @@
 use context_interface::result::Output;
 use core::ops::Range;
-use interpreter::{CallOutcome, CreateOutcome, Gas, InstructionResult, InterpreterResult};
+use interpreter::{
+    CallOutcome, CreateOutcome, ExtendedOutcome, Gas, InstructionResult, InterpreterResult,
+};
 use primitives::Address;
 
 /// Call Frame
@@ -26,6 +28,12 @@ pub struct EOFCreateFrame {
     pub created_address: Address,
 }
 
+// NP TODO
+/// Extended Frame
+#[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct ExtendedFrame {}
+
 /// Frame Data
 ///
 /// [`FrameData`] bundles different types of frames.
@@ -35,6 +43,7 @@ pub enum FrameData {
     Call(CallFrame),
     Create(CreateFrame),
     EOFCreate(EOFCreateFrame),
+    Extended(ExtendedFrame),
 }
 
 /// Frame Result
@@ -44,6 +53,7 @@ pub enum FrameResult {
     Call(CallOutcome),
     Create(CreateOutcome),
     EOFCreate(CreateOutcome),
+    Extended(ExtendedOutcome),
 }
 
 impl FrameResult {
@@ -54,6 +64,7 @@ impl FrameResult {
             FrameResult::Call(outcome) => outcome.result,
             FrameResult::Create(outcome) => outcome.result,
             FrameResult::EOFCreate(outcome) => outcome.result,
+            FrameResult::Extended(outcome) => outcome.result,
         }
     }
 
@@ -68,6 +79,8 @@ impl FrameResult {
             FrameResult::EOFCreate(outcome) => {
                 Output::Create(outcome.result.output.clone(), outcome.address)
             }
+            // NP TODO
+            FrameResult::Extended(outcome) => todo!(),
         }
     }
 
@@ -78,6 +91,7 @@ impl FrameResult {
             FrameResult::Call(outcome) => &outcome.result.gas,
             FrameResult::Create(outcome) => &outcome.result.gas,
             FrameResult::EOFCreate(outcome) => &outcome.result.gas,
+            FrameResult::Extended(outcome) => &outcome.result.gas,
         }
     }
 
@@ -88,6 +102,7 @@ impl FrameResult {
             FrameResult::Call(outcome) => &mut outcome.result.gas,
             FrameResult::Create(outcome) => &mut outcome.result.gas,
             FrameResult::EOFCreate(outcome) => &mut outcome.result.gas,
+            FrameResult::Extended(outcome) => &mut outcome.result.gas,
         }
     }
 
@@ -98,6 +113,7 @@ impl FrameResult {
             FrameResult::Call(outcome) => &outcome.result,
             FrameResult::Create(outcome) => &outcome.result,
             FrameResult::EOFCreate(outcome) => &outcome.result,
+            FrameResult::Extended(outcome) => &outcome.result,
         }
     }
 
@@ -108,6 +124,7 @@ impl FrameResult {
             FrameResult::Call(outcome) => &mut outcome.result,
             FrameResult::Create(outcome) => &mut outcome.result,
             FrameResult::EOFCreate(outcome) => &mut outcome.result,
+            FrameResult::Extended(outcome) => &mut outcome.result,
         }
     }
 

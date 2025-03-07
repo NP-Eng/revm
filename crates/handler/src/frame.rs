@@ -18,6 +18,7 @@ use interpreter::{
     CreateScheme, EOFCreateInputs, EOFCreateKind, FrameInput, Gas, InputsImpl, InstructionResult,
     Interpreter, InterpreterAction, InterpreterResult, InterpreterTypes, SharedMemory,
 };
+use interpreter::{ExtendedInputs, ExtendedOutcome};
 use precompile::PrecompileError;
 use primitives::{keccak256, Address, Bytes, B256, U256};
 use specification::{
@@ -28,6 +29,7 @@ use state::Bytecode;
 use std::borrow::ToOwned;
 use std::{boxed::Box, rc::Rc, sync::Arc};
 
+// NP EXPL only has implementor of in this repo: EthFrame
 /// Call frame trait
 pub trait Frame: Sized {
     type Evm;
@@ -55,6 +57,7 @@ pub trait Frame: Sized {
     ) -> Result<(), Self::Error>;
 }
 
+// NP EXPL only implementor of Frame in this repo
 pub struct EthFrame<EVM, ERROR, IW: InterpreterTypes> {
     phantom: core::marker::PhantomData<(EVM, ERROR)>,
     /// Data of the frame.
@@ -497,6 +500,15 @@ where
         )))
     }
 
+    pub fn make_extended_frame(
+        evm: &mut EVM,
+        depth: usize,
+        memory: Rc<RefCell<SharedMemory>>,
+        inputs: ExtendedInputs,
+    ) -> Result<ItemOrResult<Self, FrameResult>, ERROR> {
+        todo!()
+    }
+
     pub fn init_with_context(
         evm: &mut EVM,
         depth: usize,
@@ -507,6 +519,7 @@ where
             FrameInput::Call(inputs) => Self::make_call_frame(evm, depth, memory, inputs),
             FrameInput::Create(inputs) => Self::make_create_frame(evm, depth, memory, inputs),
             FrameInput::EOFCreate(inputs) => Self::make_eofcreate_frame(evm, depth, memory, inputs),
+            FrameInput::Extended(inputs) => Self::make_extended_frame(evm, depth, memory, inputs),
         }
     }
 }
@@ -608,6 +621,13 @@ where
                 ItemOrResult::Result(FrameResult::EOFCreate(CreateOutcome::new(
                     interpreter_result,
                     Some(frame.created_address),
+                )))
+            }
+            FrameData::Extended(frame) => {
+                return_extended(context.journal(), self.checkpoint, &mut interpreter_result);
+
+                ItemOrResult::Result(FrameResult::Extended(ExtendedOutcome::new(
+                    interpreter_result,
                 )))
             }
         };
@@ -731,6 +751,9 @@ where
                 // Safe to push without stack limit check
                 let _ = interpreter.stack.push(stack_item);
             }
+            FrameResult::Extended(outcome) => {
+                todo!()
+            }
         }
 
         Ok(())
@@ -833,4 +856,12 @@ pub fn return_eofcreate<JOURNAL: Journal>(
 
     // Eof bytecode is going to be hashed.
     journal.set_code(address, Bytecode::Eof(Arc::new(bytecode)));
+}
+
+fn return_extended<JOURNAL: Journal>(
+    journal: &mut JOURNAL,
+    checkpoint: JournalCheckpoint,
+    interpreter_result: &mut InterpreterResult,
+) {
+    todo!()
 }

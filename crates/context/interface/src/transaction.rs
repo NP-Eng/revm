@@ -3,6 +3,7 @@ pub mod eip2930;
 pub mod eip7702;
 pub mod transaction_type;
 
+pub use alloy_consensus::transaction::CommitmentBytes;
 pub use alloy_types::{
     AccessList, AccessListItem, Authorization, RecoveredAuthority, RecoveredAuthorization,
     SignedAuthorization,
@@ -144,6 +145,9 @@ pub trait Transaction {
         };
         min(max_fee, base_fee.saturating_add(max_priority_fee))
     }
+
+    /// Returns commitment for the transaction.
+    fn commitment(&self) -> Option<&CommitmentBytes>;
 }
 
 #[auto_impl(&, &mut, Box, Arc)]

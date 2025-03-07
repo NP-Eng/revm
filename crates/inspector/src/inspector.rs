@@ -10,8 +10,9 @@ use interpreter::{
     interpreter::EthInterpreter,
     interpreter_types::{Jumps, LoopControl},
     table::InstructionTable,
-    CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, FrameInput, Host,
-    InitialAndFloorGas, InstructionResult, Interpreter, InterpreterAction, InterpreterTypes,
+    CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, ExtendedInputs,
+    ExtendedOutcome, FrameInput, Host, InitialAndFloorGas, InstructionResult, Interpreter,
+    InterpreterAction, InterpreterTypes,
 };
 use primitives::{Address, Log, U256};
 use state::EvmState;
@@ -131,6 +132,29 @@ pub trait Inspector<CTX, INTR: InterpreterTypes = EthInterpreter> {
         context: &mut CTX,
         inputs: &EOFCreateInputs,
         outcome: &mut CreateOutcome,
+    ) {
+        let _ = context;
+        let _ = inputs;
+        let _ = outcome;
+    }
+
+    /// NP TODO
+    fn extended(
+        &mut self,
+        context: &mut CTX,
+        inputs: &mut ExtendedInputs,
+    ) -> Option<ExtendedOutcome> {
+        let _ = context;
+        let _ = inputs;
+        None
+    }
+
+    /// NP TODO
+    fn extended_end(
+        &mut self,
+        context: &mut CTX,
+        inputs: &ExtendedInputs,
+        outcome: &mut ExtendedOutcome,
     ) {
         let _ = context;
         let _ = inputs;
@@ -332,6 +356,11 @@ fn frame_start<CTX, INTR: InterpreterTypes>(
                 return Some(FrameResult::EOFCreate(output));
             }
         }
+        FrameInput::Extended(i) => {
+            if let Some(output) = inspector.extended(context, i) {
+                return Some(FrameResult::Extended(output));
+            }
+        }
     }
     None
 }
@@ -360,6 +389,12 @@ fn frame_end<CTX, INTR: InterpreterTypes>(
                 panic!("FrameInput::EofCreate expected");
             };
             inspector.eofcreate_end(context, i, outcome);
+        }
+        FrameResult::Extended(outcome) => {
+            let FrameInput::Extended(i) = frame_input else {
+                panic!("FrameInput::Extended expected");
+            };
+            inspector.extended_end(context, i, outcome);
         }
     }
 }

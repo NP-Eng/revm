@@ -2,6 +2,7 @@ use crate::setters::ContextSetters;
 use core::fmt::Debug;
 use core::ops::{Deref, DerefMut};
 
+// NP EXPL This represents one transaction
 #[derive(Debug)]
 pub struct Evm<CTX, INSP, I, P> {
     pub data: EvmData<CTX, INSP>,

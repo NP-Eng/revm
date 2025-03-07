@@ -1,7 +1,7 @@
 use super::deposit::{DepositTransaction, DepositTransactionParts};
 use auto_impl::auto_impl;
 use revm::{
-    context::TxEnv,
+    context::{transaction::CommitmentBytes, TxEnv},
     context_interface::transaction::Transaction,
     primitives::{Address, Bytes, TxKind, B256, U256},
 };
@@ -115,6 +115,10 @@ impl<T: Transaction> Transaction for OpTransaction<T> {
 
     fn authorization_list(&self) -> impl Iterator<Item = &Self::Authorization> {
         self.base.authorization_list()
+    }
+
+    fn commitment(&self) -> Option<&CommitmentBytes> {
+        self.base.commitment()
     }
 }
 

@@ -32,6 +32,9 @@ specification.workspace = true
 bytecode.workspace = true
 auto_impl.workspace = true
 
+# alloy
+alloy-consensus.workspace = true
+
 # misc
 derive-where.workspace = true
 cfg-if.workspace = true

@@ -113,6 +113,15 @@ thiserror = "2.0"
 triehash = "0.8"
 walkdir = "2.5"
 
+[patch.crates-io]
+alloy-consensus = { path = "../alloy/crates/consensus" }
+alloy-eips = { path = "../alloy/crates/eips" }
+alloy-provider = { path = "../alloy/crates/provider" }
+alloy-signer = { path = "../alloy/crates/signer" }
+alloy-signer-local = { path = "../alloy/crates/signer-local" }
+alloy-transport = { path = "../alloy/crates/transport" }
+alloy-transport-http = { path = "../alloy/crates/transport-http" }
+
 [workspace.package]
 license = "MIT"
 authors = ["Dragan Rakita <dragan0rakita@gmail.com>"]

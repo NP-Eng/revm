@@ -1,4 +1,5 @@
 use crate::TransactionType;
+use alloy_consensus::transaction::CommitmentBytes;
 use context_interface::transaction::{AccessList, SignedAuthorization, Transaction};
 use core::fmt::Debug;
 use primitives::{Address, Bytes, TxKind, B256, U256};
@@ -73,6 +74,10 @@ pub struct TxEnv {
     ///
     /// [EIP-7702]: https://eips.ethereum.org/EIPS/eip-7702
     pub authorization_list: Vec<SignedAuthorization>,
+
+    // NP TODO doc
+    /// NP TODO doc
+    pub commitment: Option<CommitmentBytes>,
 }
 
 impl Default for TxEnv {
@@ -92,6 +97,7 @@ impl Default for TxEnv {
             blob_hashes: Vec::new(),
             max_fee_per_blob_gas: 0,
             authorization_list: Vec::new(),
+            commitment: None,
         }
     }
 }
@@ -108,6 +114,11 @@ impl TxEnv {
     /// Returns error in case some fields were not set correctly.
     pub fn derive_tx_type(&mut self) -> Result<(), DeriveTxTypeError> {
         let mut tx_type = TransactionType::Legacy;
+
+        // NP TODO doc
+        if self.commitment.is_some() {
+            tx_type = TransactionType::Extended;
+        }
 
         if !self.access_list.0.is_empty() {
             tx_type = TransactionType::Eip2930;
@@ -204,5 +215,9 @@ impl Transaction for TxEnv {
 
     fn max_priority_fee_per_gas(&self) -> Option<u128> {
         self.gas_priority_fee
+    }
+
+    fn commitment(&self) -> Option<&CommitmentBytes> {
+        self.commitment.as_ref()
     }
 }

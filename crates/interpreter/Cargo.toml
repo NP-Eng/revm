@@ -28,6 +28,9 @@ primitives.workspace = true
 specification.workspace = true
 context-interface.workspace = true
 
+# alloy
+alloy-consensus.workspace = true
+
 # optional
 serde = { workspace = true, features = ["derive", "rc"], optional = true }
 

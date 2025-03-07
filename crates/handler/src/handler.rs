@@ -75,6 +75,8 @@ where
     }
 }
 
+// NP EXPL This trait has two implementors in this repo: Evm (un handler.rs) and
+// EvmOp (for optimistic stuff, in crates/optimism/src/evm.rs)
 #[auto_impl(&mut, Box)]
 pub trait EvmTr {
     type Context: ContextTr;
@@ -97,6 +99,7 @@ pub trait EvmTr {
     fn ctx_precompiles(&mut self) -> (&mut Self::Context, &mut Self::Precompiles);
 }
 
+// NP TODO Has three implementations. We have only tackled Mainnethandler
 pub trait Handler {
     type Evm: EvmTr<Context: ContextTr<Journal: Journal<FinalOutput = (EvmState, Vec<Log>)>>>;
     type Error: EvmTrError<Self::Evm>;
@@ -144,12 +147,17 @@ pub trait Handler {
         evm: &mut Self::Evm,
         init_and_floor_gas: &InitialAndFloorGas,
     ) -> Result<FrameResult, Self::Error> {
+        // NP EXPL this subtracts from the gas limit chosen by the user the
+        // minimal, always-on gas costs of initialisation, etc.
         let gas_limit = evm.ctx().tx().gas_limit() - init_and_floor_gas.initial_gas;
 
         // Create first frame action
         let first_frame = self.create_first_frame(evm, gas_limit)?;
         let mut frame_result = match first_frame {
             ItemOrResult::Item(frame) => self.run_exec_loop(evm, frame)?,
+            // NP EXPL If this function was called with an EVM whose first frame
+            // was already of type result, simply unwrap it and move onto final
+            // processing
             ItemOrResult::Result(result) => result,
         };
 

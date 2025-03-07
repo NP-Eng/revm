@@ -3,14 +3,18 @@ mod call_outcome;
 mod create_inputs;
 mod create_outcome;
 mod eof_create_inputs;
+mod extended_inputs;
+mod extended_outcome;
 
+use crate::InterpreterResult;
 pub use call_inputs::{CallInputs, CallScheme, CallValue};
 pub use call_outcome::CallOutcome;
 pub use create_inputs::CreateInputs;
 pub use create_outcome::CreateOutcome;
 pub use eof_create_inputs::{EOFCreateInputs, EOFCreateKind};
+pub use extended_inputs::ExtendedInputs;
+pub use extended_outcome::ExtendedOutcome;
 
-use crate::InterpreterResult;
 use std::boxed::Box;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -23,6 +27,9 @@ pub enum FrameInput {
     Create(Box<CreateInputs>),
     /// EOF `CREATE` instruction called.
     EOFCreate(Box<EOFCreateInputs>),
+    // NP TODO doc
+    /// NP TODO doc
+    Extended(ExtendedInputs),
 }
 
 impl AsMut<Self> for FrameInput {
