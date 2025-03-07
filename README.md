@@ -15,7 +15,7 @@ Revm is a highly efficient and stable implementation of the Ethereum Virtual Mac
 
 Known for its robustness, it stands as one of the most popular libraries and critical component of the Ethereum ecosystem. Revm plays a crucial role across various projects, being widely utilized by almost all tooling and block builders. It is integrated into Reth, multiple Layer 2 variants and other clients and serving as a standard for zkVMs.
 
-Revm offers two primary applications: firstly, it functions as an executor where users can set up block info and process mainnet transactions; secondly, it acts as a framework that facilitates the extension and support of different EVM variants such as revm-optimism.
+Revm offers two primary applications: firstly, it functions as an executor where users can set up block info and process mainnet transactions; secondly, it acts as a framework that facilitates the extension and support of different EVM variants such as op-revm.
 
 ### How to use:
 
@@ -30,7 +30,7 @@ let mut evm = evm.with_inspector(tracer);
 let out = evm.inspect_with_tx(tx);
 ```
 
-The Evm Framework API is somewhat complex to use, but this document provides a detailed explanation. It enables users to extend logic, incorporate various context types, and offers built-in support for inspection. For a practical example, you can refer to the revm-optimism crate.
+The Evm Framework API is somewhat complex to use, but this document provides a detailed explanation. It enables users to extend logic, incorporate various context types, and offers built-in support for inspection. For a practical example, you can refer to the op-revm crate.
 
 ### Users:
 
@@ -40,7 +40,7 @@ As previously noted, there are several groups of projects that utilize this tech
 * **Clients**: [Reth](https://github.com/paradigmxyz/reth), [Helios](https://github.com/a16z/helios), [Trin](https://github.com/ethereum/trin),..
 * **Tooling**: [Foundry](https://github.com/foundry-rs/foundry/), [Hardhat](https://github.com/NomicFoundation/hardhat),..
 * **L2s**: [Optimism](https://github.com/bluealloy/revm/tree/main/crates/optimism), [Coinbase](https://www.base.org/), [Scroll](https://github.com/scroll-tech/revm),..
-* **zkVM**: [Risc0](https://github.com/risc0/risc0-ethereum), [Succinct](https://github.com/succinctlabs/sp1-reth),..
+* **zkVM**: [Risc0](https://github.com/risc0/risc0-ethereum), [Succinct](https://github.com/succinctlabs/rsp),..
 
 The full list of projects that use Revm is available in the awesome-revm section of the book.
 

@@ -7,9 +7,9 @@ use handler::{
     execution, EvmTr, Frame, FrameInitOrResult, FrameOrResult, FrameResult, Handler, ItemOrResult,
 };
 use interpreter::{
+    instructions::InstructionTable,
     interpreter::EthInterpreter,
     interpreter_types::{Jumps, LoopControl},
-    table::InstructionTable,
     CallInputs, CallOutcome, CreateInputs, CreateOutcome, EOFCreateInputs, FrameInput, Host,
     InitialAndFloorGas, InstructionResult, Interpreter, InterpreterAction, InterpreterTypes,
 };
@@ -17,7 +17,7 @@ use primitives::{Address, Log, U256};
 use state::EvmState;
 use std::{vec, vec::Vec};
 
-/// EVM [Interpreter] callbacks.
+/// EVM hooks into execution.
 #[auto_impl(&mut, Box)]
 pub trait Inspector<CTX, INTR: InterpreterTypes = EthInterpreter> {
     /// Called before the interpreter is initialized.
@@ -188,6 +188,16 @@ where
     type IT: InterpreterTypes;
 
     fn inspect_run(
+        &mut self,
+        evm: &mut Self::Evm,
+    ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
+        match self.inspect_run_without_catch_error(evm) {
+            Ok(output) => Ok(output),
+            Err(e) => self.catch_error(evm, e),
+        }
+    }
+
+    fn inspect_run_without_catch_error(
         &mut self,
         evm: &mut Self::Evm,
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {

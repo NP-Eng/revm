@@ -10,7 +10,9 @@ use context_interface::{
     Cfg, Database, Journal, Transaction,
 };
 use core::mem;
-use interpreter::{FrameInput, Host, InitialAndFloorGas, Interpreter, InterpreterAction};
+use interpreter::{
+    FrameInput, Host, InitialAndFloorGas, Interpreter, InterpreterAction, InterpreterTypes,
+};
 use precompile::PrecompileError;
 use primitives::Log;
 use state::EvmState;
@@ -37,7 +39,10 @@ impl<
 impl<CTX, INSP, I, P> EvmTr for Evm<CTX, INSP, I, P>
 where
     CTX: ContextTr + Host,
-    I: InstructionProvider<Context = CTX, Output = InterpreterAction>,
+    I: InstructionProvider<
+        Context = CTX,
+        InterpreterTypes: InterpreterTypes<Output = InterpreterAction>,
+    >,
 {
     type Context = CTX;
     type Instructions = I;
@@ -49,7 +54,8 @@ where
         interpreter: &mut Interpreter<
             <Self::Instructions as InstructionProvider>::InterpreterTypes,
         >,
-    ) -> <Self::Instructions as InstructionProvider>::Output {
+    ) -> <<Self::Instructions as InstructionProvider>::InterpreterTypes as InterpreterTypes>::Output
+    {
         let context = &mut self.data.ctx;
         let instructions = &mut self.instruction;
         interpreter.run_plain(instructions.instruction_table(), context)
@@ -86,7 +92,7 @@ pub trait EvmTr {
         interpreter: &mut Interpreter<
             <Self::Instructions as InstructionProvider>::InterpreterTypes,
         >,
-    ) -> <Self::Instructions as InstructionProvider>::Output;
+    ) -> <<Self::Instructions as InstructionProvider>::InterpreterTypes as InterpreterTypes>::Output;
 
     fn ctx(&mut self) -> &mut Self::Context;
 
@@ -116,11 +122,24 @@ pub trait Handler {
         &mut self,
         evm: &mut Self::Evm,
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
+        // run inner handler and catch all errors to handle cleanup.
+        match self.run_without_catch_error(evm) {
+            Ok(output) => Ok(output),
+            Err(e) => self.catch_error(evm, e),
+        }
+    }
+
+    #[inline]
+    fn run_without_catch_error(
+        &mut self,
+        evm: &mut Self::Evm,
+    ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
         let init_and_floor_gas = self.validate(evm)?;
         let eip7702_refund = self.pre_execution(evm)? as i64;
         let exec_result = self.execution(evm, &init_and_floor_gas)?;
         self.post_execution(evm, exec_result, init_and_floor_gas, eip7702_refund)
     }
+
     /// Call all validation functions
     #[inline]
     fn validate(&self, evm: &mut Self::Evm) -> Result<InitialAndFloorGas, Self::Error> {
@@ -174,11 +193,7 @@ pub trait Handler {
         // Reward beneficiary
         self.reward_beneficiary(evm, &mut exec_result)?;
         // Prepare output of transaction.
-        let output = self.output(evm, exec_result)?;
-        // Clear any internal state.
-        self.clear(evm);
-        // Return output
-        Ok(output)
+        self.output(evm, exec_result)
     }
 
     /* VALIDATION */
@@ -371,28 +386,24 @@ pub trait Handler {
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
         let ctx = evm.ctx();
         mem::replace(ctx.error(), Ok(()))?;
-        Ok(post_execution::output(ctx, result))
+        let output = post_execution::output(ctx, result);
+
+        // clear journal
+        evm.ctx().journal().clear();
+        Ok(output)
     }
 
-    /// Called when execution ends.
+    /// Called every time at the end of execution. Used for clearing the journal.
     ///
     /// End handle in comparison to output handle will be called every time after execution.
-    ///
-    /// While output will be omitted in case of the error.
     #[inline]
-    fn end(
+    fn catch_error(
         &self,
-        _evm: &mut Self::Evm,
-        end_output: Result<ResultAndState<Self::HaltReason>, Self::Error>,
+        evm: &mut Self::Evm,
+        error: Self::Error,
     ) -> Result<ResultAndState<Self::HaltReason>, Self::Error> {
-        end_output
-    }
-
-    /// Clean handler. It resets internal Journal state to default one.
-    ///
-    /// This handle is called every time regardless of the result of the transaction.
-    #[inline]
-    fn clear(&self, evm: &mut Self::Evm) {
+        // do the cleanup of journal if error is caught
         evm.ctx().journal().clear();
+        Err(error)
     }
 }

@@ -1,7 +1,6 @@
 pub use context_interface::Cfg;
 
-use interpreter::MAX_CODE_SIZE;
-use specification::hardfork::SpecId;
+use specification::{eip170::MAX_CODE_SIZE, hardfork::SpecId};
 use std::{vec, vec::Vec};
 
 /// EVM configuration
@@ -76,6 +75,26 @@ impl CfgEnv {
 }
 
 impl<SPEC> CfgEnv<SPEC> {
+    pub fn new_with_spec(spec: SPEC) -> Self {
+        Self {
+            chain_id: 1,
+            limit_contract_code_size: None,
+            spec,
+            disable_nonce_check: false,
+            blob_target_and_max_count: vec![(SpecId::CANCUN, 3, 6), (SpecId::PRAGUE, 6, 9)],
+            #[cfg(feature = "memory_limit")]
+            memory_limit: (1 << 32) - 1,
+            #[cfg(feature = "optional_balance_check")]
+            disable_balance_check: false,
+            #[cfg(feature = "optional_block_gas_limit")]
+            disable_block_gas_limit: false,
+            #[cfg(feature = "optional_eip3607")]
+            disable_eip3607: false,
+            #[cfg(feature = "optional_no_base_fee")]
+            disable_base_fee: false,
+        }
+    }
+
     pub fn with_chain_id(mut self, chain_id: u64) -> Self {
         self.chain_id = chain_id;
         self
@@ -157,6 +176,7 @@ impl<SPEC: Into<SpecId> + Copy> Cfg for CfgEnv<SPEC> {
         }
     }
 
+    /// Returns `true` if the block gas limit is disabled.
     fn is_block_gas_limit_disabled(&self) -> bool {
         cfg_if::cfg_if! {
             if #[cfg(feature = "optional_block_gas_limit")] {
@@ -184,23 +204,7 @@ impl<SPEC: Into<SpecId> + Copy> Cfg for CfgEnv<SPEC> {
 
 impl<SPEC: Default> Default for CfgEnv<SPEC> {
     fn default() -> Self {
-        Self {
-            chain_id: 1,
-            limit_contract_code_size: None,
-            spec: Default::default(),
-            disable_nonce_check: false,
-            blob_target_and_max_count: vec![(SpecId::CANCUN, 3, 6), (SpecId::PRAGUE, 6, 9)],
-            #[cfg(feature = "memory_limit")]
-            memory_limit: (1 << 32) - 1,
-            #[cfg(feature = "optional_balance_check")]
-            disable_balance_check: false,
-            #[cfg(feature = "optional_block_gas_limit")]
-            disable_block_gas_limit: false,
-            #[cfg(feature = "optional_eip3607")]
-            disable_eip3607: false,
-            #[cfg(feature = "optional_no_base_fee")]
-            disable_base_fee: false,
-        }
+        Self::new_with_spec(SPEC::default())
     }
 }
 

@@ -78,7 +78,6 @@ where
         Instructions: InstructionProvider<
             Context = EVM::Context,
             InterpreterTypes = EthInterpreter,
-            Output = InterpreterAction,
         >,
     >,
     ERROR: From<ContextTrDbError<EVM::Context>> + From<PrecompileError>,
@@ -519,7 +518,6 @@ where
         Instructions: InstructionProvider<
             Context = EVM::Context,
             InterpreterTypes = EthInterpreter,
-            Output = InterpreterAction,
         >,
     >,
     ERROR: From<ContextTrDbError<EVM::Context>> + From<PrecompileError>,
@@ -629,7 +627,7 @@ where
                 let interpreter = &mut self.interpreter;
                 let mem_length = outcome.memory_length();
                 let mem_start = outcome.memory_start();
-                *interpreter.return_data.buffer_mut() = outcome.result.output;
+                interpreter.return_data.set_buffer(outcome.result.output);
 
                 let target_len = min(mem_length, returned_len);
 
@@ -655,27 +653,34 @@ where
 
                 // Return unspend gas.
                 if ins_result.is_ok_or_revert() {
-                    interpreter.control.gas().erase_cost(out_gas.remaining());
+                    interpreter
+                        .control
+                        .gas_mut()
+                        .erase_cost(out_gas.remaining());
                     self.memory
                         .borrow_mut()
                         .set(mem_start, &interpreter.return_data.buffer()[..target_len]);
                 }
 
                 if ins_result.is_ok() {
-                    interpreter.control.gas().record_refund(out_gas.refunded());
+                    interpreter
+                        .control
+                        .gas_mut()
+                        .record_refund(out_gas.refunded());
                 }
             }
             FrameResult::Create(outcome) => {
                 let instruction_result = *outcome.instruction_result();
                 let interpreter = &mut self.interpreter;
 
-                let buffer = interpreter.return_data.buffer_mut();
                 if instruction_result == InstructionResult::Revert {
                     // Save data to return data buffer if the create reverted
-                    *buffer = outcome.output().to_owned()
+                    interpreter
+                        .return_data
+                        .set_buffer(outcome.output().to_owned());
                 } else {
                     // Otherwise clear it. Note that RETURN opcode should abort.
-                    buffer.clear();
+                    interpreter.return_data.clear();
                 };
 
                 assert_ne!(
@@ -684,7 +689,7 @@ where
                     "Fatal external error in insert_eofcreate_outcome"
                 );
 
-                let this_gas = interpreter.control.gas();
+                let this_gas = interpreter.control.gas_mut();
                 if instruction_result.is_ok_or_revert() {
                     this_gas.erase_cost(outcome.gas().remaining());
                 }
@@ -704,10 +709,12 @@ where
                 let interpreter = &mut self.interpreter;
                 if instruction_result == InstructionResult::Revert {
                     // Save data to return data buffer if the create reverted
-                    *interpreter.return_data.buffer_mut() = outcome.output().to_owned()
+                    interpreter
+                        .return_data
+                        .set_buffer(outcome.output().to_owned());
                 } else {
                     // Otherwise clear it. Note that RETURN opcode should abort.
-                    interpreter.return_data.buffer_mut().clear();
+                    interpreter.return_data.clear()
                 };
 
                 assert_ne!(
@@ -716,7 +723,7 @@ where
                     "Fatal external error in insert_eofcreate_outcome"
                 );
 
-                let this_gas = interpreter.control.gas();
+                let this_gas = interpreter.control.gas_mut();
                 if instruction_result.is_ok_or_revert() {
                     this_gas.erase_cost(outcome.gas().remaining());
                 }

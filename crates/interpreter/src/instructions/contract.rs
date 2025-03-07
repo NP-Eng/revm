@@ -15,7 +15,7 @@ use crate::{
     InterpreterAction, InterpreterResult,
 };
 use bytecode::eof::{Eof, EofHeader};
-use context_interface::{Cfg, CreateScheme};
+use context_interface::CreateScheme;
 use core::cmp::max;
 use primitives::{keccak256, Address, Bytes, B256, U256};
 use specification::hardfork::SpecId;
@@ -186,6 +186,7 @@ pub fn extcall_gas_calc<WIRE: InterpreterTypes, H: Host + ?Sized>(
             .set_instruction_result(InstructionResult::FatalExternalError);
         return None;
     };
+
     // account_load.is_empty will be accounted if there is transfer value
     // Berlin can be hardcoded as extcall came after berlin.
     let call_cost = gas::call_cost(
@@ -213,7 +214,7 @@ pub fn extcall_gas_calc<WIRE: InterpreterTypes, H: Host + ?Sized>(
         // Push 1 to stack to indicate that call light failed.
         // It is safe to ignore stack overflow error as we already popped multiple values from stack.
         let _ = interpreter.stack.push(U256::from(1));
-        interpreter.return_data.buffer_mut().clear();
+        interpreter.return_data.clear();
         // Return none to continue execution.
         return None;
     }
@@ -388,8 +389,7 @@ pub fn create<WIRE: InterpreterTypes, const IS_CREATE2: bool, H: Host + ?Sized>(
             .is_enabled_in(SpecId::SHANGHAI)
         {
             // Limit is set as double of max contract bytecode size
-            let max_initcode_size = host.cfg().max_code_size().saturating_mul(2);
-            if len > max_initcode_size {
+            if len > host.max_initcode_size() {
                 interpreter
                     .control
                     .set_instruction_result(InstructionResult::CreateInitCodeSizeLimit);
@@ -467,6 +467,7 @@ pub fn call<WIRE: InterpreterTypes, H: Host + ?Sized>(
             .set_instruction_result(InstructionResult::FatalExternalError);
         return;
     };
+
     let Some(mut gas_limit) =
         calc_call_gas(interpreter, account_load, has_transfer, local_gas_limit)
     else {
@@ -518,6 +519,7 @@ pub fn call_code<WIRE: InterpreterTypes, H: Host + ?Sized>(
             .set_instruction_result(InstructionResult::FatalExternalError);
         return;
     };
+
     // Set `is_empty` to false as we are not creating this account.
     load.is_empty = false;
     let Some(mut gas_limit) = calc_call_gas(interpreter, load, !value.is_zero(), local_gas_limit)
@@ -570,6 +572,7 @@ pub fn delegate_call<WIRE: InterpreterTypes, H: Host + ?Sized>(
             .set_instruction_result(InstructionResult::FatalExternalError);
         return;
     };
+
     // Set is_empty to false as we are not creating this account.
     load.is_empty = false;
     let Some(gas_limit) = calc_call_gas(interpreter, load, false, local_gas_limit) else {
