@@ -29,7 +29,7 @@ pub trait Compressor<T> {
 
 
 
-impl <N: Clone> VirtualMerkleTree<N> 
+impl <N: Clone + PartialEq> VirtualMerkleTree<N> 
 {
     pub fn empty(height: usize) -> Self {
         VirtualMerkleTree {
@@ -150,7 +150,7 @@ impl <N: Clone> VirtualMerkleTree<N>
         self.nodes[level].get(index).cloned().unwrap_or_else(|| C::iterated_compression(self.height() - level))
     }
 
-    fn path(&self, mut index: usize) -> Vec<N> {
+    pub fn path(&self, mut index: usize) -> Vec<N> {
         assert!(
             index < self.num_leaves(),
             "Requested path from leaf with index {}, but the tree only has {} leaves",
@@ -158,14 +158,14 @@ impl <N: Clone> VirtualMerkleTree<N>
             self.num_leaves()
         );
 
-        self.nodes.iter().map(|level| {
+        self.nodes.iter().rev().map(|level| {
             let node = level[index].clone();
             index = index / 2;
             node
         }).collect()
     }
 
-    fn path_siblings<C: Compressor<N>>(&self, mut index: usize) -> Vec<N> {
+    pub fn path_siblings<C: Compressor<N>>(&self, mut index: usize) -> Vec<N> {
         assert!(
             index < self.num_leaves(),
             "Requested path siblings from leaf with index {}, but the tree only has {} leaves",
@@ -173,7 +173,7 @@ impl <N: Clone> VirtualMerkleTree<N>
             self.num_leaves()
         );
 
-        (1..self.height()).rev().map(|level| {
+        (1..=self.height()).rev().map(|level| {
             let sibling_index = index + 1 - 2 * (index % 2);
             let sibling = self.virtual_node_unchecked::<C>(level, sibling_index).clone();
             index = index / 2;
@@ -181,11 +181,29 @@ impl <N: Clone> VirtualMerkleTree<N>
         }).collect()
     }
 
+    pub fn verify_leaf<C: Compressor<N>>(leaf: N, root: &N, index: usize, path_siblings: &[N]) -> bool {
+        
+        let (mut leaf, mut index) = (leaf, index);
+        for sibling in path_siblings {
+
+            leaf = if index % 2 == 0 {
+                C::compress(&leaf, sibling)
+            } else {
+                C::compress(sibling, &leaf)
+            };
+
+            index = index / 2;
+        }
+
+        leaf == *root
+    }
+
     fn root<C: Compressor<N>>(&self) -> N {
         self.virtual_node_unchecked::<C>(0, 0)
     }
 }
 
+// NP TODO remove or improve, eg print empty
 impl<N: Clone + Display> Display for VirtualMerkleTree<N> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for level in self.nodes.iter() {
