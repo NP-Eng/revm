@@ -5,28 +5,34 @@ mod tests;
 
 use core::{fmt, fmt::Display};
 
-pub trait Compressor<T> {
+pub trait Compressor<T>: Eq {
     fn compress(&self, left: &T, right: &T) -> T;
     fn iterated_compression(n: usize) -> &'static T;
+    fn load() -> Self;
 }
 
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VirtualMerkleTree<N, C: Compressor<N>> {
     // NP TODO doc
     /// NP TODO doc
     nodes: Vec<Vec<N>>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    // NP TODO test
+    #[cfg_attr(feature = "serde", serde(default = "C::load"))]
     compressor: C,
     // NP TODO put height as a field or generic? Otherwise optimise calls
 }
 
 impl<N, C> VirtualMerkleTree<N, C>
 where
-    N: Clone + PartialEq + 'static,
+    N: Clone + Eq + 'static,
     C: Compressor<N>,
 {
-    pub fn empty(height: usize, compressor: C) -> Self {
+    pub fn empty(height: usize) -> Self {
         VirtualMerkleTree {
             nodes: vec![vec![]; height + 1],
-            compressor,
+            compressor: C::load(),
         }
     }
 

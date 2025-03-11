@@ -26,6 +26,7 @@ all = "warn"
 primitives.workspace = true
 bytecode.workspace = true
 specification.workspace = true
+pool.workspace = true
 
 # misc
 bitflags.workspace = true
@@ -42,4 +43,5 @@ serde = [
     "bitflags/serde",
     "bytecode/serde",
     "specification/serde",
+    "pool/serde"
 ]

@@ -15,6 +15,10 @@ impl Compressor<isize> for MultiplicativeCompressor {
     fn iterated_compression(n: usize) -> &'static isize {
         MULTIPLICATIVE_COMPRESSOR_ITERATED_HASHES.get(n).unwrap()
     }
+
+    fn load() -> Self {
+        MultiplicativeCompressor
+    }
 }
 
 struct AddMinus5Compressor;
@@ -27,6 +31,10 @@ impl Compressor<isize> for AddMinus5Compressor {
     fn iterated_compression(n: usize) -> &'static isize {
         ADDMINUS5_COMPRESSOR_ITERATED_HASHES.get(n).unwrap()
     }
+
+    fn load() -> Self {
+        AddMinus5Compressor
+    }
 }
 
 #[test]
@@ -34,7 +42,7 @@ fn test_root() {
     let height = 4;
 
     let mut rng = rand::thread_rng();
-    let mut tree = VirtualMerkleTree::empty(height, MultiplicativeCompressor);
+    let mut tree = VirtualMerkleTree::<_, MultiplicativeCompressor>::empty(height);
 
     let mut expected_root = 1 << (1 << height);
     assert_eq!(tree.root(), expected_root);
@@ -59,7 +67,7 @@ fn test_path_siblings() {
     let height = 4;
 
     let mut rng = rand::thread_rng();
-    let mut tree = VirtualMerkleTree::empty(height, AddMinus5Compressor);
+    let mut tree: VirtualMerkleTree::<isize, AddMinus5Compressor> = VirtualMerkleTree::empty(height);
 
     (0..(1 << (height - 1))).for_each(|_| {
         let val: isize = rng.gen();

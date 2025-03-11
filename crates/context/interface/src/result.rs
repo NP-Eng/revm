@@ -4,13 +4,14 @@ use database_interface::DBErrorMarker;
 use primitives::{Address, Bytes, Log, U256};
 use state::EvmState;
 use std::{boxed::Box, string::String, vec::Vec};
+use serde::{Deserialize, Serialize};
 
 pub trait HaltReasonTr: Clone + Debug + PartialEq + Eq + From<HaltReason> {}
 
 impl<T> HaltReasonTr for T where T: Clone + Debug + PartialEq + Eq + From<HaltReason> {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone, Eq, PartialEq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ResultAndState<HaltReasonTy = HaltReason> {
     /// Status of execution
     pub result: ExecutionResult<HaltReasonTy>,

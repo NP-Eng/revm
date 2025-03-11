@@ -25,9 +25,6 @@ pub struct JournaledState<DB> {
     pub database: DB,
     /// The current state
     pub state: EvmState,
-    // NP TODO doc
-    /// NP TODO doc
-    pub note_tree: NoteTree,
     /// Transient storage that is discarded after every transaction.
     ///
     /// See [EIP-1153](https://eips.ethereum.org/EIPS/eip-1153).

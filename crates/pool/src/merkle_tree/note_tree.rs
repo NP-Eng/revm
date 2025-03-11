@@ -1,9 +1,15 @@
-use crate::merkle_tree::Compressor;
+use crate::{merkle_tree::Compressor, NOTE_TREE_HEIGHT};
 use primitives::{alloy_primitives::keccak256, hex::FromHex, B256};
 
 use super::VirtualMerkleTree;
 
-pub type NoteTree<B256> = VirtualMerkleTree<B256, KeccakCompressor>;
+pub type NoteTree = VirtualMerkleTree<B256, KeccakCompressor>;
+
+impl Default for NoteTree {
+    fn default() -> Self {
+        Self::empty(NOTE_TREE_HEIGHT)
+    }
+}
 
 // hashes[0] = 0x6e700000000000000000007072697661637900000000000000000000706f6f6c
 //           = hex("np\0\0\0\0\0\0\0\0\0privacy\0\0\0\0\0\0\0\0\0\0pool")
@@ -265,7 +271,8 @@ const ITERATED_HASHES: [B256; 42] = [
     ]),
 ];
 
-pub(crate) struct KeccakCompressor;
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct KeccakCompressor;
 
 impl Compressor<B256> for KeccakCompressor {
     fn compress(&self, left: &B256, right: &B256) -> B256 {
@@ -279,6 +286,10 @@ impl Compressor<B256> for KeccakCompressor {
         ITERATED_HASHES
             .get(n)
             .expect(format!("Iterated hash of depth {} must be precomputed", n).as_str())
+    }
+
+    fn load() -> Self {
+        KeccakCompressor
     }
 }
 

@@ -1,7 +1,6 @@
 use crate::DatabaseCommit;
 use core::{convert::Infallible, error::Error, fmt};
-use primitives::{Address, HashMap};
-use state::Account;
+use state::EvmState;
 use std::sync::Arc;
 
 /// EVM database commit interface that can fail.
@@ -14,7 +13,7 @@ pub trait TryDatabaseCommit {
     type Error: Error;
 
     /// Attempt to commit changes to the database.
-    fn try_commit(&mut self, changes: HashMap<Address, Account>) -> Result<(), Self::Error>;
+    fn try_commit(&mut self, changes: EvmState) -> Result<(), Self::Error>;
 }
 
 impl<Db> TryDatabaseCommit for Db
@@ -24,7 +23,7 @@ where
     type Error = Infallible;
 
     #[inline]
-    fn try_commit(&mut self, changes: HashMap<Address, Account>) -> Result<(), Self::Error> {
+    fn try_commit(&mut self, changes: EvmState) -> Result<(), Self::Error> {
         self.commit(changes);
         Ok(())
     }
@@ -50,7 +49,7 @@ where
     type Error = ArcUpgradeError;
 
     #[inline]
-    fn try_commit(&mut self, changes: HashMap<Address, Account>) -> Result<(), Self::Error> {
+    fn try_commit(&mut self, changes: EvmState) -> Result<(), Self::Error> {
         Arc::get_mut(self)
             .map(|db| db.commit(changes))
             .ok_or(ArcUpgradeError)
@@ -66,7 +65,7 @@ mod test {
     struct MockDb;
 
     impl DatabaseCommit for MockDb {
-        fn commit(&mut self, _changes: HashMap<Address, Account>) {}
+        fn commit(&mut self, _changes: EvmState) {}
     }
 
     #[test]
