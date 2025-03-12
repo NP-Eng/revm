@@ -1,3 +1,4 @@
+use alloy_consensus::transaction::CommitmentBytes;
 use bytecode::{Bytecode, EOF_MAGIC_BYTES, EOF_MAGIC_HASH};
 use context_interface::journaled_state::{AccountLoad, Journal, JournalCheckpoint, TransferError};
 use database_interface::Database;
@@ -267,7 +268,7 @@ impl<DB: Database> JournaledState<DB> {
     pub fn new(spec: SpecId, database: DB) -> JournaledState<DB> {
         Self {
             database,
-            state: HashMap::default(),
+            state: EvmState::default(),
             transient_storage: TransientStorage::default(),
             logs: Vec::new(),
             journal: vec![vec![]],
@@ -295,7 +296,7 @@ impl<DB: Database> JournaledState<DB> {
     /// be removed from state.
     #[inline]
     pub fn touch(&mut self, address: &Address) {
-        if let Some(account) = self.state.get_mut(address) {
+        if let Some(account) = self.state.account_state.get_mut(address) {
             Self::touch_account(self.journal.last_mut().unwrap(), address, account);
         }
     }
@@ -319,6 +320,7 @@ impl<DB: Database> JournaledState<DB> {
     #[inline]
     pub fn account(&self, address: Address) -> &Account {
         self.state
+            .account_state
             .get(&address)
             .expect("Account expected to be loaded") // Always assume that acc is already loaded
     }
@@ -328,7 +330,7 @@ impl<DB: Database> JournaledState<DB> {
     /// Note: Assume account is warm and that hash is calculated from code.
     #[inline]
     pub fn set_code_with_hash(&mut self, address: Address, code: Bytecode, hash: B256) {
-        let account = self.state.get_mut(&address).unwrap();
+        let account = self.state.account_state.get_mut(&address).unwrap();
         Self::touch_account(self.journal.last_mut().unwrap(), &address, account);
 
         self.journal
@@ -351,7 +353,7 @@ impl<DB: Database> JournaledState<DB> {
 
     #[inline]
     pub fn inc_nonce(&mut self, address: Address) -> Option<u64> {
-        let account = self.state.get_mut(&address).unwrap();
+        let account = self.state.account_state.get_mut(&address).unwrap();
         // Check if nonce is going to overflow.
         if account.info.nonce == u64::MAX {
             return None;
@@ -367,6 +369,8 @@ impl<DB: Database> JournaledState<DB> {
         Some(account.info.nonce)
     }
 
+    // NP TODO is this a good place for "shield"?
+
     /// Transfers balance from two accounts. Returns error if sender balance is not enough.
     #[inline]
     pub fn transfer(
@@ -378,7 +382,7 @@ impl<DB: Database> JournaledState<DB> {
         if balance.is_zero() {
             self.load_account(*to)?;
             let _ = self.load_account(*to)?;
-            let to_account = self.state.get_mut(to).unwrap();
+            let to_account = self.state.account_state.get_mut(to).unwrap();
             Self::touch_account(self.journal.last_mut().unwrap(), to, to_account);
             return Ok(None);
         }
@@ -387,7 +391,7 @@ impl<DB: Database> JournaledState<DB> {
         self.load_account(*to)?;
 
         // sub balance from
-        let from_account = &mut self.state.get_mut(from).unwrap();
+        let from_account = &mut self.state.account_state.get_mut(from).unwrap();
         Self::touch_account(self.journal.last_mut().unwrap(), from, from_account);
         let from_balance = &mut from_account.info.balance;
 
@@ -397,7 +401,7 @@ impl<DB: Database> JournaledState<DB> {
         *from_balance = from_balance_decr;
 
         // add balance to
-        let to_account = &mut self.state.get_mut(to).unwrap();
+        let to_account = &mut self.state.account_state.get_mut(to).unwrap();
         Self::touch_account(self.journal.last_mut().unwrap(), to, to_account);
         let to_balance = &mut to_account.info.balance;
         let Some(to_balance_incr) = to_balance.checked_add(balance) else {
@@ -488,7 +492,7 @@ impl<DB: Database> JournaledState<DB> {
         let checkpoint = self.checkpoint();
 
         // Fetch balance of caller.
-        let caller_balance = self.state.get(&caller).unwrap().info.balance;
+        let caller_balance = self.state.account_state.get(&caller).unwrap().info.balance;
         // Check if caller has enough balance to send to the created contract.
         if caller_balance < balance {
             self.checkpoint_revert(checkpoint);
@@ -496,7 +500,7 @@ impl<DB: Database> JournaledState<DB> {
         }
 
         // Newly created account is present, as we just loaded it.
-        let target_acc = self.state.get_mut(&target_address).unwrap();
+        let target_acc = self.state.account_state.get_mut(&target_address).unwrap();
         let last_journal = self.journal.last_mut().unwrap();
 
         // New account can be created if:
@@ -534,7 +538,7 @@ impl<DB: Database> JournaledState<DB> {
         target_acc.info.balance = new_balance;
 
         // safe to decrement for the caller as balance check is already done.
-        self.state.get_mut(&caller).unwrap().info.balance -= balance;
+        self.state.account_state.get_mut(&caller).unwrap().info.balance -= balance;
 
         // add journal entry of transferred balance
         last_journal.push(JournalEntry::BalanceTransfer {
@@ -545,6 +549,8 @@ impl<DB: Database> JournaledState<DB> {
 
         Ok(checkpoint)
     }
+
+    // NP TODO think this through
 
     /// Reverts all changes that happened in given journal entries.
     #[inline]
@@ -557,14 +563,14 @@ impl<DB: Database> JournaledState<DB> {
         for entry in journal_entries.into_iter().rev() {
             match entry {
                 JournalEntry::AccountWarmed { address } => {
-                    state.get_mut(&address).unwrap().mark_cold();
+                    state.account_state.get_mut(&address).unwrap().mark_cold();
                 }
                 JournalEntry::AccountTouched { address } => {
                     if is_spurious_dragon_enabled && address == PRECOMPILE3 {
                         continue;
                     }
                     // remove touched status
-                    state.get_mut(&address).unwrap().unmark_touch();
+                    state.account_state.get_mut(&address).unwrap().unmark_touch();
                 }
                 JournalEntry::AccountDestroyed {
                     address,
@@ -572,7 +578,7 @@ impl<DB: Database> JournaledState<DB> {
                     was_destroyed,
                     had_balance,
                 } => {
-                    let account = state.get_mut(&address).unwrap();
+                    let account = state.account_state.get_mut(&address).unwrap();
                     // set previous state of selfdestructed flag, as there could be multiple
                     // selfdestructs in one transaction.
                     if was_destroyed {
@@ -585,19 +591,29 @@ impl<DB: Database> JournaledState<DB> {
                     account.info.balance += had_balance;
 
                     if address != target {
-                        let target = state.get_mut(&target).unwrap();
+                        let target = state.account_state.get_mut(&target).unwrap();
                         target.info.balance -= had_balance;
                     }
                 }
                 JournalEntry::BalanceTransfer { from, to, balance } => {
                     // we don't need to check overflow and underflow when adding and subtracting the balance.
-                    let from = state.get_mut(&from).unwrap();
+                    let from = state.account_state.get_mut(&from).unwrap();
                     from.info.balance += balance;
-                    let to = state.get_mut(&to).unwrap();
+                    let to = state.account_state.get_mut(&to).unwrap();
                     to.info.balance -= balance;
                 }
+                JournalEntry::BalanceShielding { from, balance, note_commitment, nullifier } => {
+                    let from = state.account_state.get_mut(&from).unwrap();
+                    from.info.balance += balance;
+                    // NP TODO test this/ensure only the last operation can be reverted
+                    // NP TODO remove
+                    assert_eq!(state.note_tree.last_leaf().unwrap(), &note_commitment);
+                    
+                    state.note_tree.pop();
+
+                }
                 JournalEntry::NonceChange { address } => {
-                    state.get_mut(&address).unwrap().info.nonce -= 1;
+                    state.account_state.get_mut(&address).unwrap().info.nonce -= 1;
                 }
                 JournalEntry::AccountCreated { address } => {
                     let account = state.get_mut(&address).unwrap();
@@ -651,6 +667,9 @@ impl<DB: Database> JournaledState<DB> {
                 }
             }
         }
+        
+        // NP TODO think how tree updates should be handled
+        state.note_tree.
     }
 
     /// Makes a checkpoint that in case of Revert can bring back state to this point.
@@ -1073,6 +1092,14 @@ pub enum JournalEntry {
         from: Address,
         to: Address,
         balance: U256,
+    },
+    /// NP TODO doc
+    // NP TODO doc
+    BalanceShielding {
+        from: Address,
+        balance: U256,
+        note_commitment: CommitmentBytes,
+        nullifier: U256,
     },
     /// Increment nonce
     /// Action: Increment nonce by one

@@ -7,6 +7,8 @@ target
 .idea
 pkg/
 
+Cargo.lock
+
 bins/revme/temp_folder
 bins/revme/tests
 ethereumjs-util.js
