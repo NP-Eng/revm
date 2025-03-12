@@ -25,3 +25,5 @@ rustc-ice-*
 /book/book
 /book/cache.json
 /index.html
+
+Cargo.lock
