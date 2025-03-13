@@ -18,3 +18,10 @@ pub type TransientStorage = HashMap<(Address, U256), U256>;
 
 /// An account's Storage is a mapping from 256-bit integer keys to [EvmStorageSlot]s.
 pub type EvmStorage = HashMap<U256, EvmStorageSlot>;
+
+impl EvmState {
+    pub fn clear(&mut self) {
+        self.account_state.clear();
+        self.note_tree.clear();
+    }
+}

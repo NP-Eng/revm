@@ -219,6 +219,13 @@ where
     pub fn root(&self) -> N {
         self.virtual_node_unchecked(0, 0)
     }
+    pub fn clear(&mut self) {
+        self.nodes.iter_mut().for_each(Vec::clear);
+    }
+
+    pub fn last_leaf(&self) -> Option<&N> {
+        self.leaves().last()
+    }
 
     // NP TODO remove this or the next
     pub fn pop_a(&mut self, n: usize) {
