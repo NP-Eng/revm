@@ -3,7 +3,7 @@ pub mod note_tree;
 #[cfg(test)]
 mod tests;
 
-use core::{fmt, fmt::Display};
+use core::{fmt, fmt::Display, fmt::Debug};
 
 pub trait Compressor<T>: Eq {
     fn compress(&self, left: &T, right: &T) -> T;
@@ -26,7 +26,8 @@ pub struct VirtualMerkleTree<N, C: Compressor<N>> {
 
 impl<N, C> VirtualMerkleTree<N, C>
 where
-    N: Clone + Eq + 'static,
+    // NP TODO remove debug
+    N: Debug + Clone + Eq + 'static,
     C: Compressor<N>,
 {
     pub fn empty(height: usize) -> Self {
@@ -215,8 +216,153 @@ where
         leaf == *root
     }
 
-    fn root(&self) -> N {
+    pub fn root(&self) -> N {
         self.virtual_node_unchecked(0, 0)
+    }
+
+    // NP TODO remove this or the next
+    pub fn pop_a(&mut self, n: usize) {
+
+        if n == 0 {
+            return;
+        }
+
+        assert!(
+            n <= self.num_leaves(),
+            "Attempted to pop {} leaves, but the tree only has {}",
+            n,
+            self.num_leaves()
+        );
+
+        // Store the left siblings of affected notes
+        let mut remaining = self.num_leaves() - n;
+        let mut modified = false;
+
+        // This early termination simplifies some checks later on
+        if remaining == 0 {
+            self.nodes = vec![vec![]; self.height() + 1];
+            return;
+        }
+
+        let mut left_siblings: Vec<N> = self.nodes.iter().skip(1).rev().filter_map(|level| {
+            let left_sibling = if remaining % 2 == 0 {
+                if modified {
+                    Some(level[remaining - 2].clone())
+                } else {
+                    None
+                }
+            } else {
+                modified = true;
+                None
+            };
+
+            remaining = (remaining + 1) / 2;
+
+            left_sibling
+        }).collect();
+
+        left_siblings = left_siblings.into_iter().rev().collect();
+
+        // Main loop: trim discarded nodes and recompute affected ones
+        let mut remaining = self.num_leaves() - n;
+        let mut modified = false;
+
+        self.nodes.last_mut().unwrap().truncate(remaining);
+
+        let mut recomputed = if remaining % 2 == 1 {
+            Some(self.leaves().last().unwrap().clone())
+        } else {
+            None
+        };
+
+        for (i, level) in self.nodes.iter_mut().rev().skip(1).enumerate() {
+            recomputed = if remaining % 2 == 1 || modified {
+                modified = true;
+                
+                let (left, right) = if remaining % 2 == 1 {
+                    (recomputed.unwrap(), C::iterated_compression(i).clone())
+                } else {
+                    (left_siblings.pop().unwrap(), recomputed.unwrap())
+                };
+
+                Some(self.compressor.compress(&left, &right))
+            } else {
+                None
+            };
+
+            remaining = (remaining + 1) / 2;
+            level.truncate(remaining);
+
+            if let Some(node) = &recomputed {
+                level[remaining - 1] = node.clone();
+            } else if remaining % 2 == 1 {
+                recomputed = level.last().cloned();
+            }
+        }
+    }
+
+    pub fn pop_c(&mut self, n: usize) {
+        let height = self.height();
+
+        if n == 0 {
+            return;
+        }
+
+        assert!(
+            n <= self.num_leaves(),
+            "Cannot pop more leaves than the tree has"
+        );
+
+        if n == 1 << height {
+            *self = Self::empty(height);
+        }
+
+        // 1. Remove Routine
+        // Remove n leaves, floor(n/2) nodes from the first level, floor(n/4) nodes from the second level, etc.
+        for level in 0..height + 1 {
+            // Take care of the first n - 1 popped leaves
+            let nodes_to_remove = (n - 1) / (1 << level);
+            let to = self.nodes[height - level].len() - nodes_to_remove;
+            self.nodes[height - level].truncate(to);
+        }
+
+        // 2. Update Routine
+        // Pop along the last path, while the popped child is a left sibling
+        let mut leaves_in_prev_level = self.num_leaves() - 1;
+        let mut level = self.height() - 1;
+        self.nodes.last_mut().unwrap().pop();
+        while leaves_in_prev_level % 2 == 0 && level > 0 {
+            self.nodes[level].pop();
+            leaves_in_prev_level = leaves_in_prev_level / 2;
+            level -= 1;
+        }
+
+        // Once a left sibling is found, update the rest of the path
+        loop {
+            let prev_level_len = self.nodes[level + 1].len();
+            let prev_is_left_child = prev_level_len % 2 != 0;
+
+            let (left_child, right_child) = if prev_is_left_child {
+                (
+                    self.nodes[level + 1][prev_level_len - 1].clone(),
+                    C::iterated_compression(height - level - 1).clone(),
+                )
+            } else {
+                (
+                    self.nodes[level + 1][prev_level_len - 2].clone(),
+                    self.nodes[level + 1][prev_level_len - 1].clone(),
+                )
+            };
+
+            *self.nodes[level].last_mut().unwrap() =
+                self.compressor.compress(&left_child, &right_child);
+
+            if level == 0 {
+                break;
+            }
+
+            level -= 1;
+        }
     }
 }
 

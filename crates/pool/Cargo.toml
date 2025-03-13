@@ -36,7 +36,6 @@ cfg-if.workspace = true
 serde = { workspace = true, features = ["derive", "rc"], optional = true }
 
 [dev-dependencies]
-database.workspace = true
 rand = { workspace = true, features = ["std"] }
 
 [features]
