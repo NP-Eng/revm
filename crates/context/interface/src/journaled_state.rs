@@ -76,6 +76,13 @@ pub trait Journal {
         balance: U256,
     ) -> Result<Option<TransferError>, <Self::Database as Database>::Error>;
 
+    fn shield(
+        &mut self,
+        from: &Address,
+        balance: U256,
+        note_commitment: B256,
+    ) -> Result<Option<TransferError>, <Self::Database as Database>::Error>;
+
     fn inc_account_nonce(
         &mut self,
         address: Address,

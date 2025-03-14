@@ -162,7 +162,7 @@ impl<ExtDB: DatabaseRef> CacheDB<ExtDB> {
 
 impl<ExtDB> DatabaseCommit for CacheDB<ExtDB> {
     fn commit(&mut self, changes: EvmState) {
-        for (address, mut account) in changes {
+        for (address, mut account) in changes.account_state {
             if !account.is_touched() {
                 continue;
             }

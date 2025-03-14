@@ -4,6 +4,8 @@ use database_interface::DBErrorMarker;
 use primitives::{Address, Bytes, Log, U256};
 use state::EvmState;
 use std::{boxed::Box, string::String, vec::Vec};
+
+#[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 pub trait HaltReasonTr: Clone + Debug + PartialEq + Eq + From<HaltReason> {}

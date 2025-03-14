@@ -3,6 +3,10 @@ use crate::{journaled_state::AccountLoad, Block, Cfg, Database, Journal, Transac
 use auto_impl::auto_impl;
 use primitives::{Address, Bytes, Log, B256, BLOCK_HASH_HISTORY, U256};
 
+// NP TODO think whether the tree and nullifiers should be part of the context
+// (e. g. so that EVM execution can query the root of the tree) and, if so, add
+// it
+
 #[auto_impl(&mut, Box)]
 pub trait ContextTr {
     type Block: Block;

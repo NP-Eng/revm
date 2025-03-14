@@ -169,6 +169,15 @@ impl<DB: Database> Journal for JournaledState<DB> {
         self.transfer(from, to, balance)
     }
 
+    fn shield(
+        &mut self,
+        from: &Address,
+        balance: U256,
+        note_commitment: B256,
+    ) -> Result<Option<TransferError>, DB::Error> { 
+        self.shield(from, balance, note_commitment)
+    }
+
     fn touch_account(&mut self, address: Address) {
         self.touch(&address);
     }
@@ -370,6 +379,49 @@ impl<DB: Database> JournaledState<DB> {
     }
 
     // NP TODO is this a good place for "shield"?
+    #[inline]
+    pub fn shield(
+        &mut self,
+        from: &Address,
+        balance: U256,
+        note_commitment: B256,
+    ) -> Result<Option<TransferError>, DB::Error> {
+
+        // NP TODO maybe set minimum note balance. One way or another, the
+        // below-minimum or zero cases should consider doing something similar
+        // to the analogous check in transfer() below
+        if balance.is_zero() {
+            // NP TODO
+            todo!()
+        }
+
+        // load account
+        self.load_account(*from)?;
+
+        // sub balance from
+        let from_account = &mut self.state.account_state.get_mut(from).unwrap();
+        Self::touch_account(self.journal.last_mut().unwrap(), from, from_account);
+        let from_balance = &mut from_account.info.balance;
+
+        let Some(from_balance_decr) = from_balance.checked_sub(balance) else {
+            return Ok(Some(TransferError::OutOfFunds));
+        };
+        *from_balance = from_balance_decr;
+
+        // add note to the tree
+        self.state.note_tree.insert(note_commitment);
+
+        self.journal
+            .last_mut()
+            .unwrap()
+            .push(JournalEntry::BalanceShielding { 
+                from: *from, 
+                balance,
+                note_commitment,
+            });
+
+        Ok(None)
+    }
 
     /// Transfers balance from two accounts. Returns error if sender balance is not enough.
     #[inline]
@@ -380,6 +432,9 @@ impl<DB: Database> JournaledState<DB> {
         balance: U256,
     ) -> Result<Option<TransferError>, DB::Error> {
         if balance.is_zero() {
+            // NP TODO why called twice? warming and actual loading?
+            // research/ask someone who knows and, if applicable, bring over to
+            // our code
             self.load_account(*to)?;
             let _ = self.load_account(*to)?;
             let to_account = self.state.account_state.get_mut(to).unwrap();
@@ -560,6 +615,8 @@ impl<DB: Database> JournaledState<DB> {
         journal_entries: Vec<JournalEntry>,
         is_spurious_dragon_enabled: bool,
     ) {
+        let mut num_removed_notes = 0;
+        
         for entry in journal_entries.into_iter().rev() {
             match entry {
                 JournalEntry::AccountWarmed { address } => {
@@ -602,21 +659,20 @@ impl<DB: Database> JournaledState<DB> {
                     let to = state.account_state.get_mut(&to).unwrap();
                     to.info.balance -= balance;
                 }
-                JournalEntry::BalanceShielding { from, balance, note_commitment, nullifier } => {
+                JournalEntry::BalanceShielding { from, balance, note_commitment } => {
                     let from = state.account_state.get_mut(&from).unwrap();
                     from.info.balance += balance;
+
+                    num_removed_notes += 1;
                     // NP TODO test this/ensure only the last operation can be reverted
                     // NP TODO remove
                     assert_eq!(state.note_tree.last_leaf().unwrap(), &note_commitment);
-                    
-                    state.note_tree.pop();
-
                 }
                 JournalEntry::NonceChange { address } => {
                     state.account_state.get_mut(&address).unwrap().info.nonce -= 1;
                 }
                 JournalEntry::AccountCreated { address } => {
-                    let account = state.get_mut(&address).unwrap();
+                    let account = state.account_state.get_mut(&address).unwrap();
                     account.unmark_created();
                     account
                         .storage
@@ -626,6 +682,7 @@ impl<DB: Database> JournaledState<DB> {
                 }
                 JournalEntry::StorageWarmed { address, key } => {
                     state
+                        .account_state
                         .get_mut(&address)
                         .unwrap()
                         .storage
@@ -639,6 +696,7 @@ impl<DB: Database> JournaledState<DB> {
                     had_value,
                 } => {
                     state
+                    .account_state  
                         .get_mut(&address)
                         .unwrap()
                         .storage
@@ -661,7 +719,7 @@ impl<DB: Database> JournaledState<DB> {
                     }
                 }
                 JournalEntry::CodeChange { address } => {
-                    let acc = state.get_mut(&address).unwrap();
+                    let acc = state.account_state.get_mut(&address).unwrap();
                     acc.info.code_hash = KECCAK_EMPTY;
                     acc.info.code = None;
                 }
@@ -669,7 +727,8 @@ impl<DB: Database> JournaledState<DB> {
         }
         
         // NP TODO think how tree updates should be handled
-        state.note_tree.
+        // NP TODO test reversal with commitments
+        state.note_tree.pop(num_removed_notes);
     }
 
     /// Makes a checkpoint that in case of Revert can bring back state to this point.
@@ -741,14 +800,14 @@ impl<DB: Database> JournaledState<DB> {
         if address != target {
             // Both accounts are loaded before this point, `address` as we execute its contract.
             // and `target` at the beginning of the function.
-            let acc_balance = self.state.get(&address).unwrap().info.balance;
+            let acc_balance = self.state.account_state.get(&address).unwrap().info.balance;
 
-            let target_account = self.state.get_mut(&target).unwrap();
+            let target_account = self.state.account_state.get_mut(&target).unwrap();
             Self::touch_account(self.journal.last_mut().unwrap(), &target, target_account);
             target_account.info.balance += acc_balance;
         }
 
-        let acc = self.state.get_mut(&address).unwrap();
+        let acc = self.state.account_state.get_mut(&address).unwrap();
         let balance = acc.info.balance;
         let previously_destroyed = acc.is_selfdestructed();
         let is_cancun_enabled = self.spec.is_enabled_in(CANCUN);
@@ -800,7 +859,7 @@ impl<DB: Database> JournaledState<DB> {
         storage_keys: impl IntoIterator<Item = U256>,
     ) -> Result<&mut Account, DB::Error> {
         // load or get account.
-        let account = match self.state.entry(address) {
+        let account = match self.state.account_state.entry(address) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(vac) => vac.insert(
                 self.database
@@ -863,7 +922,7 @@ impl<DB: Database> JournaledState<DB> {
         address: Address,
         load_code: bool,
     ) -> Result<StateLoad<&mut Account>, DB::Error> {
-        let load = match self.state.entry(address) {
+        let load = match self.state.account_state.entry(address) {
             Entry::Occupied(entry) => {
                 let account = entry.into_mut();
                 let is_cold = account.mark_warm();
@@ -918,7 +977,7 @@ impl<DB: Database> JournaledState<DB> {
     #[inline]
     pub fn sload(&mut self, address: Address, key: U256) -> Result<StateLoad<U256>, DB::Error> {
         // assume acc is warm
-        let account = self.state.get_mut(&address).unwrap();
+        let account = self.state.account_state.get_mut(&address).unwrap();
         // only if account is created in this tx we can assume that storage is empty.
         let is_newly_created = account.is_created();
         let (value, is_cold) = match account.storage.entry(key) {
@@ -966,7 +1025,7 @@ impl<DB: Database> JournaledState<DB> {
     ) -> Result<StateLoad<SStoreResult>, DB::Error> {
         // assume that acc exists and load the slot.
         let present = self.sload(address, key)?;
-        let acc = self.state.get_mut(&address).unwrap();
+        let acc = self.state.account_state.get_mut(&address).unwrap();
 
         // if there is no original value in dirty return present value, that is our original.
         let slot = acc.storage.get_mut(&key).unwrap();
@@ -1099,7 +1158,6 @@ pub enum JournalEntry {
         from: Address,
         balance: U256,
         note_commitment: CommitmentBytes,
-        nullifier: U256,
     },
     /// Increment nonce
     /// Action: Increment nonce by one
