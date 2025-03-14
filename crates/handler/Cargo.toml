@@ -22,6 +22,9 @@ rust_2018_idioms = "deny"
 all = "warn"
 
 [dependencies]
+# alloy
+alloy-consensus.workspace = true
+
 # revm
 database-interface.workspace = true
 interpreter.workspace = true

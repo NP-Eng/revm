@@ -28,6 +28,7 @@ use specification::{
 use state::Bytecode;
 use std::borrow::ToOwned;
 use std::{boxed::Box, rc::Rc, sync::Arc};
+use alloy_consensus::transaction::EXTENDED_GAS_COST;
 
 // NP EXPL only has implementor of in this repo: EthFrame
 /// Call frame trait
@@ -506,11 +507,55 @@ where
         memory: Rc<RefCell<SharedMemory>>,
         inputs: ExtendedInputs,
     ) -> Result<ItemOrResult<Self, FrameResult>, ERROR> {
-        todo!()
+        // NP TODO IMPORTANT: Verify proof that the hidden balance is correct?
+        
+        let context = evm.ctx();
 
-        // Checks
+        let return_result = |instruction_result: InstructionResult| {
+            Ok(ItemOrResult::Result(FrameResult::Extended(ExtendedOutcome {
+                result: InterpreterResult {
+                    result: instruction_result,                    
+                    gas: Gas::new(EXTENDED_GAS_COST),
+                    output: Bytes::new(),
+                },
+            })))
+        };
 
-        // Warm up tree with sibling paths?
+        // NP TODO ensure this is correct
+        // Shielding can only be triggered as a transaction, and not as a result
+        // of smart-contract execution
+        if depth > 0 as usize {
+            // NP TODO create new InstructionResult variant?
+            return return_result(InstructionResult::CallTooDeep);
+        }
+
+        // NP If we decide to work with warmed-up, only-partially-in-memory
+        // trees, warm the tree up here
+
+        // NP TODO is this necessary? Is this done correctly?
+        // Create subroutine checkpoint
+        let checkpoint = context.journal().checkpoint();
+
+        // NP TODO do we want to assert balance is not minimal?
+
+        // Touch address. For "EIP-158 State Clear", this will erase empty accounts.
+        // Transfer value from caller to called account
+        // Target will get touched even if balance transferred is zero.
+        if let Some(i) =
+            context
+                .journal()
+                .shield(&inputs.caller, inputs.value, inputs.commitment)?
+        {
+            context.journal().checkpoint_revert(checkpoint);
+            return return_result(i.into());
+        }
+
+        if context.journal().inc_account_nonce(inputs.caller)? == None {
+            return return_result(InstructionResult::Return);
+        }
+
+        context.journal().checkpoint_commit();
+        return return_result(InstructionResult::Stop);
     }
 
     pub fn init_with_context(

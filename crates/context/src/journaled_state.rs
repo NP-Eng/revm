@@ -4,7 +4,7 @@ use context_interface::journaled_state::{AccountLoad, Journal, JournalCheckpoint
 use database_interface::Database;
 use interpreter::{SStoreResult, SelfDestructResult, StateLoad};
 use primitives::{
-    hash_map::Entry, Address, Bytes, HashMap, HashSet, Log, B256, KECCAK_EMPTY, PRECOMPILE3, U256,
+    hash_map::Entry, Address, Bytes, HashSet, Log, B256, KECCAK_EMPTY, PRECOMPILE3, U256,
 };
 use specification::hardfork::{SpecId, SpecId::*};
 use state::{Account, EvmState, EvmStorageSlot, TransientStorage};
@@ -408,6 +408,8 @@ impl<DB: Database> JournaledState<DB> {
         };
         *from_balance = from_balance_decr;
 
+        // NP TODO handle full tree and other bad cases properly
+        
         // add note to the tree
         self.state.note_tree.insert(note_commitment);
 

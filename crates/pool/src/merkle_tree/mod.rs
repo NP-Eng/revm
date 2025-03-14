@@ -63,7 +63,7 @@ where
         self.nodes.len() - 1
     }
 
-    pub fn insert(&mut self, leaf: N) {
+    pub fn insert(&mut self, leaf: N) -> Option<usize> {
         // NP TODO rethink whether in loop one can work with references/optimise
         // memory management
 
@@ -100,6 +100,8 @@ where
 
             is_left_child = index % 2 == 0;
         }
+
+        Some(num_leaves)
     }
 
     pub fn virtual_leaf(&self, index: usize) -> N {

@@ -58,7 +58,7 @@ fn test_root() {
             new_leaf = rng.gen_range(-10..=10);
         }
 
-        tree.insert(new_leaf);
+        tree.insert(new_leaf).unwrap();
 
         expected_root = expected_root / 2 * new_leaf;
 
@@ -75,7 +75,7 @@ fn test_path_siblings() {
 
     (0..(1 << (height - 1))).for_each(|_| {
         let val: isize = rng.gen();
-        tree.insert(val / (1 << (height + 1)))
+        tree.insert(val / (1 << (height + 1))).unwrap();
     });
 
     // NP TODO this is really ugly; Maybe treat the empty-tree case separately?
@@ -128,7 +128,7 @@ where
         let mut tree = VirtualMerkleTree::<T, C>::empty(height);
         
         for leaf in leaves.clone() {
-            tree.insert(leaf);
+            tree.insert(leaf).unwrap();
         }
         
         for num_popped in 0..=num_leaves {
@@ -138,7 +138,7 @@ where
             let mut expected_tree = VirtualMerkleTree::<T, C>::empty(height);
             
             for leaf in leaves.iter().take(num_leaves - num_popped) {
-                expected_tree.insert(leaf.clone());
+                expected_tree.insert(leaf.clone()).unwrap();
             }
 
             assert_eq!(popped_tree, expected_tree);
