@@ -11,7 +11,7 @@ pub trait Compressor<T>: Eq {
     fn load() -> Self;
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct VirtualMerkleTree<N, C: Compressor<N>> {
     // NP TODO doc
@@ -227,8 +227,7 @@ where
         self.leaves().last()
     }
 
-    // NP TODO remove this or the next
-    pub fn pop_a(&mut self, n: usize) {
+    pub fn pop(&mut self, n: usize) {
 
         if n == 0 {
             return;
@@ -241,17 +240,19 @@ where
             self.num_leaves()
         );
 
+        let height = self.height();
+
         // Store the left siblings of affected notes
         let mut remaining = self.num_leaves() - n;
         let mut modified = false;
 
         // This early termination simplifies some checks later on
         if remaining == 0 {
-            self.nodes = vec![vec![]; self.height() + 1];
+            self.nodes = vec![vec![]; height + 1];
             return;
         }
 
-        let mut left_siblings: Vec<N> = self.nodes.iter().skip(1).rev().filter_map(|level| {
+        let left_siblings: Vec<Option<N>> = self.nodes.iter().skip(1).rev().map(|level| {
             let left_sibling = if remaining % 2 == 0 {
                 if modified {
                     Some(level[remaining - 2].clone())
@@ -267,8 +268,6 @@ where
 
             left_sibling
         }).collect();
-
-        left_siblings = left_siblings.into_iter().rev().collect();
 
         // Main loop: trim discarded nodes and recompute affected ones
         let mut remaining = self.num_leaves() - n;
@@ -287,12 +286,12 @@ where
                 modified = true;
                 
                 let (left, right) = if remaining % 2 == 1 {
-                    (recomputed.unwrap(), C::iterated_compression(i).clone())
+                    (&recomputed.unwrap(), &C::iterated_compression(i).clone())
                 } else {
-                    (left_siblings.pop().unwrap(), recomputed.unwrap())
+                    (left_siblings[i].as_ref().unwrap(), &recomputed.unwrap())
                 };
 
-                Some(self.compressor.compress(&left, &right))
+                Some(self.compressor.compress(left, right))
             } else {
                 None
             };
@@ -305,70 +304,6 @@ where
             } else if remaining % 2 == 1 {
                 recomputed = level.last().cloned();
             }
-        }
-    }
-
-    pub fn pop_c(&mut self, n: usize) {
-        let height = self.height();
-
-        if n == 0 {
-            return;
-        }
-
-        assert!(
-            n <= self.num_leaves(),
-            "Cannot pop more leaves than the tree has"
-        );
-
-        if n == 1 << height {
-            *self = Self::empty(height);
-        }
-
-        // 1. Remove Routine
-        // Remove n leaves, floor(n/2) nodes from the first level, floor(n/4) nodes from the second level, etc.
-        for level in 0..height + 1 {
-            // Take care of the first n - 1 popped leaves
-            let nodes_to_remove = (n - 1) / (1 << level);
-            let to = self.nodes[height - level].len() - nodes_to_remove;
-            self.nodes[height - level].truncate(to);
-        }
-
-        // 2. Update Routine
-        // Pop along the last path, while the popped child is a left sibling
-        let mut leaves_in_prev_level = self.num_leaves() - 1;
-        let mut level = self.height() - 1;
-        self.nodes.last_mut().unwrap().pop();
-        while leaves_in_prev_level % 2 == 0 && level > 0 {
-            self.nodes[level].pop();
-            leaves_in_prev_level = leaves_in_prev_level / 2;
-            level -= 1;
-        }
-
-        // Once a left sibling is found, update the rest of the path
-        loop {
-            let prev_level_len = self.nodes[level + 1].len();
-            let prev_is_left_child = prev_level_len % 2 != 0;
-
-            let (left_child, right_child) = if prev_is_left_child {
-                (
-                    self.nodes[level + 1][prev_level_len - 1].clone(),
-                    C::iterated_compression(height - level - 1).clone(),
-                )
-            } else {
-                (
-                    self.nodes[level + 1][prev_level_len - 2].clone(),
-                    self.nodes[level + 1][prev_level_len - 1].clone(),
-                )
-            };
-
-            *self.nodes[level].last_mut().unwrap() =
-                self.compressor.compress(&left_child, &right_child);
-
-            if level == 0 {
-                break;
-            }
-
-            level -= 1;
         }
     }
 }
@@ -388,5 +323,17 @@ impl<N: Clone + Display, C: Compressor<N>> Display for VirtualMerkleTree<N, C> {
             )?;
         }
         Ok(())
+    }
+}
+
+impl<N: Clone + Debug + Eq + 'static, C: Compressor<N>> fmt::Debug for VirtualMerkleTree<N, C> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "VirtualMerkleTree of height {} with root {:?}, number of leaves: {}",
+            self.height(),
+            self.root(),
+            self.num_leaves(),
+        )
     }
 }

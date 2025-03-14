@@ -24,7 +24,7 @@ impl Compressor<isize> for MultiplicativeCompressor {
     }
 }
 
-#[derive(Eq, PartialEq, Debug)]
+#[derive(Eq, PartialEq, Debug, Clone)]
 struct AddMinus5Compressor;
 
 impl Compressor<isize> for AddMinus5Compressor {
@@ -117,97 +117,51 @@ fn test_iterated_hashes_keccak() {
     test_iterated_hashes(KeccakCompressor, 42);
 }
 
-
-fn test_pop_with_compressor<T, C>(height: usize, n_trees: usize, mut gen_leaf: impl FnMut() -> T)
+fn test_pop_with_compressor<T, C>(height: usize, mut gen_leaf: impl FnMut() -> T)
 where 
     T: PartialEq + Eq + Display + Debug + 'static + Clone,
     C: Compressor<T> + Clone,       
-{
-    // for num_leaves in ((1 << (height - 1)) + 1)..= (1 << height) {
-    //     for num_popped in 0..=num_leaves {
-
-    for (num_leaves, num_popped) in [
-        ((1 << 15), (1 << 13) - 3),
-        ((1 << 15), (1 << 13) - 2),
-        ((1 << 15), (1 << 13) - 1),
-        ((1 << 15), (1 << 13) + 0),
-        ((1 << 15), (1 << 13) + 1),
-        ((1 << 15), (1 << 13) + 2),
-        ((1 << 15), (1 << 13) + 3),
-        ((1 << 15) - 3, (1 << 13) - 3),
-        ((1 << 15) - 2, (1 << 13) - 2),
-        ((1 << 15) - 1, (1 << 13) - 1),
-        ((1 << 15) + 0, (1 << 13) + 0),
-        ((1 << 15) + 1, (1 << 13) + 1),
-        ((1 << 15) + 2, (1 << 13) + 2),
-        ((1 << 15) + 3, (1 << 13) + 2),
-        ((1 << 15), (1 << 12) - 3),
-        ((1 << 15), (1 << 12) - 2),
-        ((1 << 15), (1 << 12) - 1),
-        ((1 << 15), (1 << 12) + 0),
-        ((1 << 15), (1 << 12) + 1),
-        ((1 << 15), (1 << 12) + 2),
-        ((1 << 15), (1 << 12) + 3),
-        ((1 << 15) - 3, (1 << 12) - 3),
-        ((1 << 15) - 2, (1 << 12) - 2),
-        ((1 << 15) - 1, (1 << 12) - 1),
-        ((1 << 15) + 0, (1 << 12) + 0),
-        ((1 << 15) + 1, (1 << 12) + 1),
-        ((1 << 15) + 2, (1 << 12) + 2),
-        ((1 << 15) + 3, (1 << 12) + 2),
-        ] {
-        println!("num_leaves: {}, num_popped: {}", num_leaves, num_popped);
-
-        let leaves = (0..num_leaves).map(|_| gen_leaf()).collect::<Vec<_>>();
-
-        // NP TODO reintroduce
-        // let mut tree = VirtualMerkleTree::<T, C>::empty(height);
-        let mut tree = VirtualMerkleTree::<T, C>::empty(if num_leaves <= 1 << 15 { 15 } else { 16 });
-
+{  
+    for num_leaves in ((1 << (height - 1)) + 1)..= (1 << height) {
+        let leaves = (0..num_leaves).map(|_| gen_leaf()).collect::<Vec<T>>();
+        
+        let mut tree = VirtualMerkleTree::<T, C>::empty(height);
+        
         for leaf in leaves.clone() {
             tree.insert(leaf);
         }
-
-        let mut trees_a = (0..n_trees).map(|_| tree.clone()).collect::<Vec<_>>();
-        let mut trees_c = (0..n_trees).map(|_| tree.clone()).collect::<Vec<_>>();
-
-        // time execution
-        let start = std::time::Instant::now();
-        for tree_a in trees_a.iter_mut() {
-            tree_a.pop_a(num_popped);
-        }
-        let duration = start.elapsed();
-        println!("   pop_a time: {:?}, average: {:?}", duration, duration / n_trees as u32);
         
-        let start = std::time::Instant::now();
-        for tree_c in trees_c.iter_mut() {
-            tree_c.pop_c(num_popped);
+        for num_popped in 0..=num_leaves {
+            let mut popped_tree = tree.clone();
+            popped_tree.pop(num_popped);
+
+            let mut expected_tree = VirtualMerkleTree::<T, C>::empty(height);
+            
+            for leaf in leaves.iter().take(num_leaves - num_popped) {
+                expected_tree.insert(leaf.clone());
+            }
+
+            assert_eq!(popped_tree, expected_tree);
         }
-        let duration = start.elapsed();
-        println!("   pop_c time: {:?}, average: {:?}", duration, duration / n_trees as u32);
-
-        // NP TODO reintroduce
-        // let mut trimmed_tree = VirtualMerkleTree::<T, C>::empty(height);
-        let mut trimmed_tree = VirtualMerkleTree::<T, C>::empty(if num_leaves <= 1 << 15 { 15 } else { 16 });
-
-        for leaf in leaves.into_iter().take(num_leaves - num_popped) {
-            trimmed_tree.insert(leaf);
-        }
-
-        assert_eq!(trees_a.last().unwrap().root(), trimmed_tree.root(), "tree_a failed");
-        //assert_eq!(trees_c.last().unwrap().root(), trimmed_tree.root(), "tree_c failed");
     }
 }
 
 #[test]
 fn test_pop_keccak() {
+    let height = 5;
 
-    // Needs 2^15 nodes * 2^5 B * 2^6 trees * 2 algorithms = 2^31 = 2 GB of memory
-    let height = 15;
-    let n_trees = 1 << 6;
-    
     let mut rng = rand::thread_rng();
     let gen_leaf = || B256::from(rng.gen::<[u8; 32]>());
+        
+    test_pop_with_compressor::<B256, KeccakCompressor>(height, gen_leaf);
+}
+
+#[test]
+fn test_pop_addminus5() {
+    let height = 6;
+
+    let mut rng = rand::thread_rng();
+    let gen_leaf = || rng.gen_range(-100..=100);
     
-    test_pop_with_compressor::<B256, KeccakCompressor>(height, n_trees, gen_leaf);
+    test_pop_with_compressor::<isize, AddMinus5Compressor>(height, gen_leaf);
 }
