@@ -1,4 +1,4 @@
-pub mod note_tree;
+pub(crate) mod note_tree;
 
 #[cfg(test)]
 mod tests;

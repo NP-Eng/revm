@@ -161,6 +161,7 @@ impl<HaltReasonTy> ExecutionResult<HaltReasonTy> {
 pub enum Output {
     Call(Bytes),
     Create(Bytes, Option<Address>),
+    Extended(Bytes),
 }
 
 impl Output {
@@ -169,6 +170,7 @@ impl Output {
         match self {
             Output::Call(data) => data,
             Output::Create(data, _) => data,
+            Output::Extended(data) => data,
         }
     }
 
@@ -177,6 +179,7 @@ impl Output {
         match self {
             Output::Call(data) => data,
             Output::Create(data, _) => data,
+            Output::Extended(data) => data,
         }
     }
 
@@ -185,6 +188,7 @@ impl Output {
         match self {
             Output::Call(_) => None,
             Output::Create(_, address) => address.as_ref(),
+            Output::Extended(_) => None,
         }
     }
 }

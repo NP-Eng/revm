@@ -28,7 +28,7 @@ pub struct EOFCreateFrame {
     pub created_address: Address,
 }
 
-// NP TODO
+// NP TODO if it remains empty, remove it and make the enum variant empty
 /// Extended Frame
 #[derive(Debug)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -79,8 +79,10 @@ impl FrameResult {
             FrameResult::EOFCreate(outcome) => {
                 Output::Create(outcome.result.output.clone(), outcome.address)
             }
-            // NP TODO
-            FrameResult::Extended(outcome) => todo!(),
+            // NP TODO place index maybe
+            FrameResult::Extended(_) => Output::Extended(
+                primitives::Bytes::default()
+            )
         }
     }
 

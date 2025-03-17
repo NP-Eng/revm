@@ -504,7 +504,6 @@ where
     pub fn make_extended_frame(
         evm: &mut EVM,
         depth: usize,
-        memory: Rc<RefCell<SharedMemory>>,
         inputs: ExtendedInputs,
     ) -> Result<ItemOrResult<Self, FrameResult>, ERROR> {
         // NP TODO IMPORTANT: Verify proof that the hidden balance is correct?
@@ -568,7 +567,7 @@ where
             FrameInput::Call(inputs) => Self::make_call_frame(evm, depth, memory, inputs),
             FrameInput::Create(inputs) => Self::make_create_frame(evm, depth, memory, inputs),
             FrameInput::EOFCreate(inputs) => Self::make_eofcreate_frame(evm, depth, memory, inputs),
-            FrameInput::Extended(inputs) => Self::make_extended_frame(evm, depth, memory, inputs),
+            FrameInput::Extended(inputs) => Self::make_extended_frame(evm, depth, inputs),
         }
     }
 }
@@ -672,8 +671,16 @@ where
                     Some(frame.created_address),
                 )))
             }
-            FrameData::Extended(frame) => {
-                return_extended(context.journal(), self.checkpoint, &mut interpreter_result);
+            FrameData::Extended(_) => {
+                // NP TODO 1) Is this correct? 2) Is this all that needs to be done?
+                // return_extended
+                // Revert changes or not.
+                if interpreter_result.result.is_ok() {
+                    // NP TODO why does commit() happen both here and in make_extended_frame?
+                    context.journal().checkpoint_commit();
+                } else {
+                    context.journal().checkpoint_revert(self.checkpoint);
+                }
 
                 ItemOrResult::Result(FrameResult::Extended(ExtendedOutcome::new(
                     interpreter_result,
@@ -722,8 +729,10 @@ where
                 // Safe to push without stack limit check
                 let _ = interpreter.stack.push(item);
 
+                // NP TODO typo unspent
                 // Return unspend gas.
                 if ins_result.is_ok_or_revert() {
+                    // NP EXPL 
                     interpreter.control.gas().erase_cost(out_gas.remaining());
                     self.memory
                         .borrow_mut()
@@ -800,8 +809,9 @@ where
                 // Safe to push without stack limit check
                 let _ = interpreter.stack.push(stack_item);
             }
-            FrameResult::Extended(outcome) => {
-                todo!()
+            FrameResult::Extended(_) => {
+                // NP TODO should we do anything? e. g. push sth onto the stack, return the leaf index, ...
+                // NP TODO handle full tree
             }
         }
 
@@ -905,12 +915,4 @@ pub fn return_eofcreate<JOURNAL: Journal>(
 
     // Eof bytecode is going to be hashed.
     journal.set_code(address, Bytecode::Eof(Arc::new(bytecode)));
-}
-
-fn return_extended<JOURNAL: Journal>(
-    journal: &mut JOURNAL,
-    checkpoint: JournalCheckpoint,
-    interpreter_result: &mut InterpreterResult,
-) {
-    todo!()
 }

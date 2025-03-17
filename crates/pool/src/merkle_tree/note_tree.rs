@@ -293,6 +293,7 @@ impl Compressor<B256> for KeccakCompressor {
     }
 }
 
+#[allow(dead_code)]
 fn compute_iterated_hashes() {
     // n p                   p r i v a c y                     p o o l
     // 6E700000000000000000007072697661637900000000000000000000706F6F6C
