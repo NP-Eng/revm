@@ -811,7 +811,7 @@ where
             }
             FrameResult::Extended(_) => {
                 // NP TODO should we do anything? e. g. push sth onto the stack, return the leaf index, ...
-                // NP TODO handle full tree
+                // NP TODO handle full-tree error
             }
         }
 
